@@ -1,0 +1,232 @@
+---
+title: "Brief Time Series"
+author: "Nuoya"
+date: "November 13, 2017"
+output: 
+  html_document:
+      keep_md: true
+---
+
+Warm Up Questions: Brief Financial Data 
+
+a. Natively in R, you have access to sample data sets of prominent stocks over time.We'll be using EuStockMarkets for this question. Type help(EuStockMarkets) to learn more. From these data, pull specifically the DAX index. For all questions in this assignment, you're welcome to normalize (or don't!) how you see fit, but, if you choose to, please document what you're doing and why for the grader. It's not necessary for the purpose of this assignment.
+
+```{r warm up question a, echo=TRUE}
+#pull the data frame,treat it as data frame first 
+ESM <- data.frame(Y= as.matrix(EuStockMarkets),Date=time(EuStockMarkets))
+
+#pull the DAX data,keep only date and DAX column
+ESMpulled <- ESM[,c(1,5)]
+
+#reorder the column
+ESMpulled <- ESMpulled[c(2,1)]
+
+#assign new names
+colnames(ESMpulled) <- c('Date','DAX')
+
+head(ESMpulled)
+```
+
+b. These are annual European Stock Data from 1990 onward. Create a rudimentary plot of the data. Make the line blue. Give an informative title. Label the axes accurately. In 1997, an event happened you want to indicate; add a vertical red line to your plot which divides pre-1997 and post-1997 information.
+
+```{r warm up question b, echo=TRUE}
+#use dyevent to add an event at a specific time point
+library(dygraphs)
+dygraph(ESMpulled, main = 'European Stock Data From 1990 Onward',xlab='Date: Year 1990 to Year 1998',ylab = 'DAX Index') %>%
+				dySeries('DAX', drawPoints = TRUE, color='blue',label = 'DAX Index') %>%
+				dyOptions(drawPoints = TRUE, pointSize = 1) %>%
+				dyEvent(x=1997,label = '1997 Event', labelLoc = 'top', color = 'red',strokePattern ='solid') 
+
+```
+
+c. Decompose the time series into its components (i.e., trend, seasonality, random). Keep in mind that this is a multiplicative model you want. Create a plot of all decomposed components. As before, make all lines blue and have a vertical divider at the year 1997.
+
+```{r warm up question c,echo=TRUE}
+library(dygraphs)
+# create a time series 
+ESMts <-  EuStockMarkets[,"DAX"]
+
+#decompostion process, let it be a multiplicative model
+decomposeDax <- decompose(ESMts, type = "multiplicative")
+
+#use the date from the original set
+date <- time(EuStockMarkets)
+
+#find the seasonal, only keep date and seasonal values
+seasonal <- data.frame(date,decomposeDax$seasonal)
+seasonal$DAX <- NULL
+names(seasonal) <- c('Date','DAXSeasonal')
+
+#find the trend, only keep date and trend values
+trend <- data.frame(date,decomposeDax$trend)
+trend$X1 <-NULL
+trend$DAX <- NULL
+names(trend) <- c('Date','DAXTrend')
+
+#find the random, only keep date and random values
+random <- data.frame(date,decomposeDax$random)
+#plot the decomposition
+random$DAX <- NULL
+names(random) <- c('Date','DAXRandom')
+
+#seasonal dygraph
+dygraph(seasonal, main = 'Decomposition: Seasonal Plot',xlab='Date: Year 1990 to Year 1998',ylab = 'Seasonal Decompostion') %>%
+				dyOptions(colors= 'blue') %>%
+				dyEvent(x=1997,label = '1997 Event', labelLoc = 'top', color = 'red',strokePattern ='solid') 
+
+#trend dygraph
+dygraph(trend, main = 'Decomposition: Trend Plot',xlab='Date: Year 1990 to Year 1998',ylab = 'Trend Decompostion') %>%
+				dyOptions(colors= 'blue') %>%
+				dyEvent(x=1997,label = '1997 Event', labelLoc = 'top', color = 'red',strokePattern ='solid') 
+
+#random dygraph
+dygraph(random, main = 'Decomposition: Random Plot',xlab='Date: Year 1990 to Year 1998',ylab = 'Random Decompostion') %>%
+				dyOptions(colors= 'blue') %>%
+				dyEvent(x=1997,label = '1997 Event', labelLoc = 'top', color = 'red',strokePattern ='solid') 
+
+
+```
+2. Temperature Data
+
+a. Using the maxtemp dataset granted by loading fpp2.
+
+```{r question2a, echo=TRUE}
+
+#converted into data frame first
+library(fpp2)
+q2data <- data.frame(Y= as.matrix(maxtemp),Date=time(maxtemp))
+names(q2data) <- c('Temp(C)','Year')
+q2data<- q2data[c(2,1)]
+rownames(q2data) <- NULL
+
+head(q2data)
+```
+
+b. We are only concerned with information after 1990.
+
+```{r question2b,echo = TRUE}
+#subset the time series by index, the index 20 is coming from the data frame q2data
+q2b <-subset(maxtemp, start=20)
+q2b
+
+```
+
+c. Utilize SES to predict the next five years of maximum temperatures in Melbourne. Plot this information, including the prior information and the forecast. Add the predicted value line across 1990-present as a separate line, preferably blue. So, to review, you should have your fit, the predicted value line overlaying it, and a forecast through 2021, all on one axis. Find the AICc of this fitted model. You will use that information later.
+
+```{r question2c, echo=TRUE}
+library(forecast)
+library(dygraphs)
+
+# before this class of q2b is forecast, change it back to time series
+q2b <- window(q2b,start = 1990)
+
+#using ses to predict the next five years
+predicted <- ses(q2b, h=5)
+
+#actual value
+actual <- predicted$x
+
+
+#fitted value
+fit <- predicted$fitted
+#the mean predicted value
+points <- predicted$mean
+
+finalpredict <- cbind(actual,fit,points)
+
+#plot the prediction
+dygraph(finalpredict ,main = 'Temperature Prediction: Simple Exponential Smoothing',xlab='Years',ylab = 'Higheset Temperature') %>%
+	#get the serieses
+	dySeries("actual", label = "actual") %>%
+	dySeries("fit", label = "fitted") %>%
+  dySeries("points", label = "Predicted") %>%
+	dyLimit(predicted$mean[1],color='blue')%>%
+	dyOptions(RColorBrewer::brewer.pal(3, "Set3")) %>%
+	dyOptions(axisLineColor = "navy", gridLineColor = "grey") %>%
+	dyHighlight(highlightCircleSize = 5,
+                  highlightSeriesOpts = list(strokeWidth = 2)) 
+#AICc for the fitted model
+AICc  <-  predicted$model$aicc
+AICc
+```
+
+d. Now use a damped Holt's linear trend to also predict out five years. Make sure initial='optimal'. As above, create a similar plot to 1C, but use the Holt fit instead.
+
+```{r question2d,echo=TRUE}
+
+q2d <- holt(q2b,initial = 'optimal',h=5,damped = TRUE)
+actual2d <- q2d$x
+fit2d <- q2d$fitted
+points2d <- q2d$mean
+finalpredict2d <- cbind(actual2d,fit2d,points2d)
+dygraph(finalpredict2d ,main = "Temperature Prediction: Holt's",xlab='Years',ylab = 'Higheset Temperature') %>%
+	#get the serieses
+	dySeries("actual2d", label = "actual") %>%
+	dySeries("fit2d", label = "fitted") %>%
+  dySeries("points2d", label = "Predicted") %>%
+	
+	dyOptions(RColorBrewer::brewer.pal(3, "Set3")) %>%
+	dyOptions(axisLineColor = "navy", gridLineColor = "grey") %>%
+	dyHighlight(highlightCircleSize = 5,
+                  highlightSeriesOpts = list(strokeWidth = 2)) 
+```
+
+e. Compare the AICc of the ses() and holt() models. Which model is better here? For model comparison, the model with the lowest AIC score is preferred. In this case, I would say holt model is preferred.
+
+```{r question2e,echo=TRUE}
+#AICc for the fitted model
+AICc2d  <-  q2d$model$aicc
+AICc
+AICc2d 
+```
+3. The Wands Choose the Wizard
+
+a. Read in both Unit11TimeSeries_Ollivander and Unit11TimeSeries_Gregorovitch.csv as two different data frames. They do not have headers, so make sure you account for that. This is a time series of Wands sold over years.
+
+```{r question3a,echo=TRUE}
+library(dygraphs)
+
+Olli <- read.csv('Unit11TimeSeries_Gregorovitch.csv',header = FALSE)
+names(Olli) <- c('Date','Ollivander')
+head(Olli)
+
+Gregor <- read.csv('Unit11TimeSeries_Ollivander.csv',header = FALSE)
+names(Gregor) <- c('Date','Gregorovitch ')
+head(Gregor)
+
+```
+
+b. You don't have your information in the proper format! In both data sets, you'll need to first convert the date-like variable to an actual Date class.
+```{r question3b, echo=TRUE}
+
+Olli$Date<- as.Date(Olli$Date,format = "%m/%d/%Y")
+class(Olli$Date)
+
+
+Gregor$Date <- as.Date(Gregor$Date ,format = "%m/%d/%Y")
+class(Gregor$Date )
+```
+
+c. Use the library xts (and the xts() function in it) to make each data frame an xts object (effectively, a time series). You'll want to order.by the Date variable.
+```{r question3c, echo=TRUE}
+library(xts)
+Ollivander <- xts(Olli$Ollivander,order.by=Olli$Date)
+Gregorovitch <- xts(Gregor$Gregorovitch,order.by=Gregor$Date)
+
+```
+
+d. Bind the two xts objects together and create a dygraph from it.
+
+```{r question3d ,echo=TRUE}
+library(dygraphs)
+q3d <- cbind(Ollivander,Gregorovitch)
+names(q3d) <- c('Ollivander','Gregorovitch')
+
+dygraph(q3d, main = 'Wands Sold Over Years',xlab='Years',ylab = 'Wands Sold') %>%
+				dyOptions(drawPoints = TRUE, pointSize = 1)%>%
+				dyShading(from = '1995/1/1', to='1999/1/1',color = "#FFE6E6", axis = "x")%>%
+				dyRangeSelector(height= 20)%>%
+				dyHighlight(highlightCircleSize = 5,
+                  highlightSeriesOpts = list(strokeWidth = 2)) 
+```
+
